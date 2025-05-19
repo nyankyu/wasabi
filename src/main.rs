@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use core::arch::asm;
 use core::mem::offset_of;
 use core::mem::size_of;
 use core::panic::PanicInfo;
@@ -40,12 +41,22 @@ fn efi_main(
         *e = 0xFF00FF00; // Fill the screen with green color
     }
 
-    loop {}
+    loop {
+        hlt();
+    }
+}
+
+pub fn hlt() {
+    unsafe {
+        asm!("hlt");
+    }
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    loop {
+        hlt();
+    }
 }
 
 #[repr(C)]
