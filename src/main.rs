@@ -148,16 +148,16 @@ fn locate_graphic_protocol<'a>(
 }
 
 trait Bitmap {
-    fn bytes_per_pixel(&self) -> i64;
-    fn pixels_per_line(&self) -> i64;
-    fn width(&self) -> i64;
-    fn height(&self) -> i64;
+    fn bytes_per_pixel(&self) -> u32;
+    fn pixels_per_line(&self) -> u32;
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
     fn buf_mut(&mut self) -> *mut u8;
 
     unsafe fn unchecked_pixel_at_mut(
         &mut self,
-        x: i64,
-        y: i64,
+        x: u32,
+        y: u32,
     ) -> *mut u32 {
         self.buf_mut().add(
             ((y * self.pixels_per_line() + x)
@@ -168,8 +168,8 @@ trait Bitmap {
 
     fn pixel_at_mut(
         &mut self,
-        x: i64,
-        y: i64,
+        x: u32,
+        y: u32,
     ) -> Option<&mut u32> {
         if self.is_in_x_range(x) && self.is_in_y_range(y) {
             unsafe {
@@ -183,38 +183,36 @@ trait Bitmap {
         }
     }
 
-    fn is_in_x_range(&self, px: i64) -> bool {
-        0 <= px
-            && px
-                < min(self.width(), self.pixels_per_line())
+    fn is_in_x_range(&self, px: u32) -> bool {
+        px < min(self.width(), self.pixels_per_line())
     }
-    fn is_in_y_range(&self, py: i64) -> bool {
-        0 <= py && py < self.height()
+    fn is_in_y_range(&self, py: u32) -> bool {
+        py < self.height()
     }
 }
 
 #[derive(Clone, Copy)]
 struct VramBufferInfo {
     buf: *mut u8,
-    width: i64,
-    height: i64,
-    pixels_per_line: i64,
+    width: u32,
+    height: u32,
+    pixels_per_line: u32,
 }
 
 impl Bitmap for VramBufferInfo {
-    fn bytes_per_pixel(&self) -> i64 {
+    fn bytes_per_pixel(&self) -> u32 {
         4
     }
 
-    fn pixels_per_line(&self) -> i64 {
+    fn pixels_per_line(&self) -> u32 {
         self.pixels_per_line
     }
 
-    fn width(&self) -> i64 {
+    fn width(&self) -> u32 {
         self.width
     }
 
-    fn height(&self) -> i64 {
+    fn height(&self) -> u32 {
         self.height
     }
 
@@ -230,9 +228,8 @@ fn init_vram(
 
     Ok(VramBufferInfo {
         buf: gp.mode.frame_buffer_base as *mut u8,
-        width: gp.mode.info.horizontal_resolution as i64,
-        height: gp.mode.info.vertical_resolution as i64,
-        pixels_per_line: gp.mode.info.pixels_per_scan_line
-            as i64,
+        width: gp.mode.info.horizontal_resolution,
+        height: gp.mode.info.vertical_resolution,
+        pixels_per_line: gp.mode.info.pixels_per_scan_line,
     })
 }
