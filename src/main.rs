@@ -27,12 +27,19 @@ fn efi_main(
     let mut vram = init_vram(efi_system_table)
         .expect("Failed to init vram");
 
-    for y in 0..vram.height {
-        for x in 0..vram.width {
-            if let Some(pixel) = vram.pixel_at_mut(x, y) {
-                *pixel = 0xFF0000;
-            }
-        }
+    let vw = vram.width();
+    let vh = vram.height();
+    fill_rect(&mut vram, 0x000000, 0, 0, vw, vh)
+        .expect("fill_rect failed");
+    fill_rect(&mut vram, 0xff0000, 32, 32, 32, 32)
+        .expect("fill_rect failed");
+    fill_rect(&mut vram, 0x00ff00, 64, 64, 64, 64)
+        .expect("fill_rect failed");
+    fill_rect(&mut vram, 0x0000ff, 128, 128, 128, 128)
+        .expect("fill_rect failed");
+
+    for i in 0..256 {
+        let _ = draw_point(&mut vram, 0x010101 * i, i, i);
     }
 
     loop {
@@ -232,4 +239,56 @@ fn init_vram(
         height: gp.mode.info.vertical_resolution,
         pixels_per_line: gp.mode.info.pixels_per_scan_line,
     })
+}
+
+unsafe fn unchecked_draw_point<T: Bitmap>(
+    buf: &mut T,
+    color: u32,
+    x: u32,
+    y: u32,
+) {
+    *buf.unchecked_pixel_at_mut(x, y) = color;
+}
+
+fn draw_point<T: Bitmap>(
+    buf: &mut T,
+    color: u32,
+    x: u32,
+    y: u32,
+) -> Result<()> {
+    *(buf.pixel_at_mut(x, y).ok_or("Out of bounds")?) =
+        color;
+    Ok(())
+}
+
+fn fill_rect<T: Bitmap>(
+    buf: &mut T,
+    color: u32,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> Result<()> {
+    if !buf.is_in_x_range(x)
+        || !buf.is_in_y_range(y)
+        || !buf.is_in_x_range(x + w - 1)
+        || !buf.is_in_y_range(y + h - 1)
+    {
+        return Err("Out of bounds");
+    }
+
+    for i in 0..h {
+        for j in 0..w {
+            unsafe {
+                unchecked_draw_point(
+                    buf,
+                    color,
+                    x + j,
+                    y + i,
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
