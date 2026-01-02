@@ -38,8 +38,48 @@ fn efi_main(
     fill_rect(&mut vram, 0x0000ff, 128, 128, 128, 128)
         .expect("fill_rect failed");
 
-    for i in 0..256 {
-        let _ = draw_point(&mut vram, 0x010101 * i, i, i);
+    draw_line(&mut vram, 0xff00ff, 600, 0, 0, 600)
+        .expect("draw_line failed");
+
+    for i in 0..20 {
+        let (x0, y0) = (400, 500);
+
+        draw_line(
+            &mut vram,
+            0xff0000,
+            x0,
+            y0,
+            x0 - 100 + i * 10,
+            y0 + 100,
+        )
+        .expect("draw_line failed");
+        draw_line(
+            &mut vram,
+            0x00ff00,
+            x0,
+            y0,
+            x0 + 100 - i * 10,
+            y0 - 100,
+        )
+        .expect("draw_line failed");
+        draw_line(
+            &mut vram,
+            0x00ffff,
+            x0,
+            y0,
+            x0 - 100,
+            y0 - 100 + i * 10,
+        )
+        .expect("draw_line failed");
+        draw_line(
+            &mut vram,
+            0xffff00,
+            x0,
+            y0,
+            x0 + 100,
+            y0 + 100 - i * 10,
+        )
+        .expect("draw_line failed");
     }
 
     loop {
@@ -161,6 +201,7 @@ trait Bitmap {
     fn height(&self) -> u32;
     fn buf_mut(&mut self) -> *mut u8;
 
+    #[allow(unused)]
     unsafe fn unchecked_pixel_at_mut(
         &mut self,
         x: u32,
@@ -173,6 +214,7 @@ trait Bitmap {
         ) as *mut u32
     }
 
+    #[allow(unused)]
     fn pixel_at_mut(
         &mut self,
         x: u32,
@@ -190,9 +232,12 @@ trait Bitmap {
         }
     }
 
+    #[allow(unused)]
     fn is_in_x_range(&self, px: u32) -> bool {
         px < min(self.width(), self.pixels_per_line())
     }
+
+    #[allow(unused)]
     fn is_in_y_range(&self, py: u32) -> bool {
         py < self.height()
     }
@@ -241,15 +286,9 @@ fn init_vram(
     })
 }
 
-unsafe fn unchecked_draw_point<T: Bitmap>(
-    buf: &mut T,
-    color: u32,
-    x: u32,
-    y: u32,
-) {
-    *buf.unchecked_pixel_at_mut(x, y) = color;
-}
-
+/// Draws a point on the bitmap with a specified color at
+/// (x, y).
+#[allow(unused)]
 fn draw_point<T: Bitmap>(
     buf: &mut T,
     color: u32,
@@ -261,6 +300,20 @@ fn draw_point<T: Bitmap>(
     Ok(())
 }
 
+#[allow(unused)]
+unsafe fn unchecked_draw_point<T: Bitmap>(
+    buf: &mut T,
+    color: u32,
+    x: u32,
+    y: u32,
+) {
+    *buf.unchecked_pixel_at_mut(x, y) = color;
+}
+
+/// Fills a rectangle on the bitmap with a specified color.
+/// (x, y) specifies the top-left corner of the rectangle,
+/// and (w, h) specify its width and height respectively.
+#[allow(unused)]
 fn fill_rect<T: Bitmap>(
     buf: &mut T,
     color: u32,
@@ -291,4 +344,79 @@ fn fill_rect<T: Bitmap>(
     }
 
     Ok(())
+}
+
+/// Draws a line on the bitmap with a specified color.
+/// (x0, y0) and (x1, y1) specify the endpoints of the line.
+#[allow(unused)]
+fn draw_line<T: Bitmap>(
+    buf: &mut T,
+    color: u32,
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+) -> Result<()> {
+    if !buf.is_in_x_range(x0)
+        || !buf.is_in_y_range(y0)
+        || !buf.is_in_x_range(x1)
+        || !buf.is_in_y_range(y1)
+    {
+        return Err("Out of bounds");
+    }
+
+    let dx = (x1 as i32 - x0 as i32).abs();
+    let dy = (y1 as i32 - y0 as i32).abs();
+    let sx = (x1 as i32 - x0 as i32).signum();
+    let sy = (y1 as i32 - y0 as i32).signum();
+
+    if dx >= dy {
+        (0..dx)
+            .map(|rx| {
+                (rx, increase_in_short_side(dx, dy, rx))
+            })
+            .for_each(|(rx, ry)| unsafe {
+                unchecked_draw_point(
+                    buf,
+                    color,
+                    (x0 as i32 + rx * sx) as u32,
+                    (y0 as i32 + ry * sy) as u32,
+                )
+            });
+    } else {
+        (0..dy)
+            .map(|ry| {
+                (increase_in_short_side(dy, dx, ry), ry)
+            })
+            .for_each(|(rx, ry)| unsafe {
+                unchecked_draw_point(
+                    buf,
+                    color,
+                    (x0 as i32 + rx * sx) as u32,
+                    (y0 as i32 + ry * sy) as u32,
+                )
+            });
+    }
+
+    Ok(())
+}
+
+/// Calculates the increase in the short side corresponding
+/// to the increase in the long side.
+/// Returns the integer closest (short_side / long_side) *
+/// i.
+///
+/// long_side: length of long side
+/// short_side: length of short side
+/// i: increase in long side
+fn increase_in_short_side(
+    long_leng: i32,
+    short_leng: i32,
+    i: i32,
+) -> i32 {
+    if long_leng == 0 {
+        0
+    } else {
+        (2 * short_leng * i + long_leng) / (2 * long_leng)
+    }
 }
