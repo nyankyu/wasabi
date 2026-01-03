@@ -350,6 +350,8 @@ fn fill_rect<T: Bitmap>(
 ) -> Result<()> {
     if !buf.is_in_x_range(x)
         || !buf.is_in_y_range(y)
+        || !buf.is_in_x_range(w)
+        || !buf.is_in_y_range(h)
         || !buf.is_in_x_range(x + w - 1)
         || !buf.is_in_y_range(y + h - 1)
     {
