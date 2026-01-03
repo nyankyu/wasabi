@@ -3,10 +3,12 @@
 
 use core::arch::asm;
 use core::cmp::min;
+use core::fmt;
 use core::mem::offset_of;
 use core::mem::size_of;
 use core::panic::PanicInfo;
 use core::ptr::null_mut;
+use core::fmt::Write;
 
 type EfiHandle = u64;
 type EfiVoid = u8;
@@ -41,10 +43,14 @@ fn efi_main(
     draw_line(&mut vram, 0xff00ff, 600, 0, 0, 600)
         .expect("draw_line failed");
 
-    draw_line(&mut vram, 0xffff00, 0, 0, vw, 0).expect("draw_line failed");
-    draw_line(&mut vram, 0xffffff, 0, 0, 0, vh).expect("draw_line failed");
-    draw_line(&mut vram, 0xffffff, vw, 0, vw, vh).expect("draw_line failed");
-    draw_line(&mut vram, 0xffffff, 0, vh, vw, vh).expect("draw_line failed");
+    draw_line(&mut vram, 0xffff00, 0, 0, vw, 0)
+        .expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, 0, 0, 0, vh)
+        .expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, vw, 0, vw, vh)
+        .expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, 0, vh, vw, vh)
+        .expect("draw_line failed");
 
     let (x0, y0) = (400, 500);
     for i in 0..=10 {
@@ -108,9 +114,124 @@ fn efi_main(
         .expect("draw_line failed");
     }
 
+    for (i, c) in "ABCDEFG".chars().enumerate() {
+        draw_font_fg(
+            &mut vram,
+            i as u32 * 16 + 256,
+            i as u32 * 16,
+            0xffffff,
+            c,
+        );
+    }
+
+    draw_str_fg(&mut vram, 1205, 500, 0xcccccc, "Hello, world!");
+
+    let mut w = VramTextWriter::new(&mut vram);
+    for i in 0..4 {
+        writeln!(w, "This is line {i}").unwrap();
+    }
+
     loop {
         hlt();
     }
+}
+
+struct VramTextWriter<'a> {
+    vram: &'a mut VramBufferInfo,
+    cursor_x: u32,
+    cursor_y: u32,
+}
+
+impl<'a> VramTextWriter<'a> {
+    fn new(vram: &'a mut VramBufferInfo) -> Self {
+        Self { vram, cursor_x: 0, cursor_y: 0 }
+    }
+}
+
+impl fmt::Write for VramTextWriter<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.chars() {
+            if c == '\n' {
+                self.cursor_x = 0;
+                self.cursor_y += 16;
+                continue;
+            }
+            draw_font_fg(self.vram, self.cursor_x, self.cursor_y, 0xffffff, c);
+            self.cursor_x += 8;
+        }
+        Ok(())
+    }
+}
+
+fn draw_str_fg<T: Bitmap>(
+    buf: &mut T,
+    x: u32,
+    y: u32,
+    color: u32,
+    s: &str,
+) {
+    s.chars().enumerate().for_each(|(i, c)| {
+        draw_font_fg(buf, x + i as u32 * 8, y, color, c)
+    });
+}
+
+fn draw_font_fg<T: Bitmap>(
+    buf: &mut T,
+    x: u32,
+    y: u32,
+    color: u32,
+    c: char,
+) {
+    let Some(font) = lookup_font(c) else {
+        return;
+    };
+    for (dy, row) in font.iter().enumerate() {
+        for (dx, pixel) in row.iter().enumerate() {
+            if *pixel != '*' {
+                continue;
+            }
+            let _ = draw_point(
+                buf,
+                color,
+                x + dx as u32,
+                y + dy as u32,
+            );
+        }
+    }
+}
+
+fn lookup_font(c: char) -> Option<[[char; 8]; 16]> {
+    const FONT_SOURCE: &str = include_str!("./font.txt");
+    if let Ok(c) = u8::try_from(c) {
+        let mut fi = FONT_SOURCE.split('\n');
+        while let Some(line) = fi.next() {
+            if let Some(line) = line.strip_prefix("0x") {
+                if let Ok(idx) =
+                    u8::from_str_radix(line, 16)
+                {
+                    if idx != c {
+                        continue;
+                    }
+                    let mut font = [['*'; 8]; 16];
+                    for (y, line) in
+                        fi.clone().take(16).enumerate()
+                    {
+                        for (x, c) in
+                            line.chars().enumerate()
+                        {
+                            if let Some(e) =
+                                font[y].get_mut(x)
+                            {
+                                *e = c;
+                            }
+                        }
+                    }
+                    return Some(font);
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn hlt() {
