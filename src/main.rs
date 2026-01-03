@@ -4,11 +4,11 @@
 use core::arch::asm;
 use core::cmp::min;
 use core::fmt;
+use core::fmt::Write;
 use core::mem::offset_of;
 use core::mem::size_of;
 use core::panic::PanicInfo;
 use core::ptr::null_mut;
-use core::fmt::Write;
 
 type EfiHandle = u64;
 type EfiVoid = u8;
@@ -19,6 +19,212 @@ type Result<T> = core::result::Result<T, &'static str>;
 #[repr(u64)]
 enum EfiStatus {
     Success = 0,
+}
+
+#[repr(i64)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
+pub enum EfiMemoryType {
+    RESERVED = 0,
+    LOADER_CODE,
+    LOADER_DATA,
+    BOOT_SERVICES_CODE,
+    BOOT_SERVICES_DATA,
+    RUNTIME_SERVICES_CODE,
+    RUNTIME_SERVICES_DATA,
+    CONVENTIONAL_MEMORY,
+    UNUSABLE_MEMORY,
+    ACPI_RECLAIM_MEMORY,
+    ACPI_MEMORY_NVS,
+    MEMORY_MAPPED_IO,
+    MEMORY_MAPPED_IO_PORT_SPACE,
+    PAL_CODE,
+    PERSISTENT_MEMORY,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct EfiMemoryDescriptor {
+    memory_type: EfiMemoryType,
+    physical_start: u64,
+    virtual_start: u64,
+    number_of_pages: u64,
+    attribute: u64,
+}
+
+const MEMORY_MAP_BUFFER_SIZE: usize = 0x8000;
+
+struct MemoryMapHolder {
+    memory_map_buffer: [u8; MEMORY_MAP_BUFFER_SIZE],
+    memory_map_size: usize,
+    map_key: usize,
+    descriptor_size: usize,
+    descriptor_version: u32,
+}
+
+struct MemoryMapIterator<'a> {
+    map: &'a MemoryMapHolder,
+    offset: usize,
+}
+
+impl<'a> Iterator for MemoryMapIterator<'a> {
+    type Item = &'a EfiMemoryDescriptor;
+
+    fn next(&mut self) -> Option<&'a EfiMemoryDescriptor> {
+        if self.offset >= self.map.memory_map_size {
+            None
+        } else {
+            let e: &EfiMemoryDescriptor = unsafe {
+                &*(self
+                    .map
+                    .memory_map_buffer
+                    .as_ptr()
+                    .add(self.offset)
+                    as *const EfiMemoryDescriptor)
+            };
+            self.offset += self.map.descriptor_size;
+            Some(e)
+        }
+    }
+}
+
+impl MemoryMapHolder {
+    pub const fn new() -> MemoryMapHolder {
+        MemoryMapHolder {
+            memory_map_buffer: [0; MEMORY_MAP_BUFFER_SIZE],
+            memory_map_size: MEMORY_MAP_BUFFER_SIZE,
+            map_key: 0,
+            descriptor_size: 0,
+            descriptor_version: 0,
+        }
+    }
+
+    pub fn iter(&self) -> MemoryMapIterator<'_> {
+        MemoryMapIterator {
+            map: self,
+            offset: 0,
+        }
+    }
+}
+
+#[repr(C)]
+struct EfiBootServicesTable {
+    _reserved0: [u64; 7],
+    get_memory_map: extern "win64" fn(
+        memory_map_size: *mut usize,
+        memory_map: *mut u8,
+        map_key: *mut usize,
+        descriptor_size: *mut usize,
+        descriptor_version: *mut u32,
+    ) -> EfiStatus,
+    _reserved1: [u64; 32],
+    locate_protocol: extern "win64" fn(
+        protocol: *const EfiGuid,
+        registration: *const EfiVoid,
+        interface: *mut *mut EfiVoid,
+    ) -> EfiStatus,
+}
+const _: () = assert!(
+    offset_of!(EfiBootServicesTable, get_memory_map) == 56
+);
+const _: () = assert!(
+    offset_of!(EfiBootServicesTable, locate_protocol)
+        == 320
+);
+
+impl EfiBootServicesTable {
+    fn get_memory_map(
+        &self,
+        map: &mut MemoryMapHolder,
+    ) -> EfiStatus {
+        (self.get_memory_map)(
+            &mut map.memory_map_size,
+            map.memory_map_buffer.as_mut_ptr(),
+            &mut map.map_key,
+            &mut map.descriptor_size,
+            &mut map.descriptor_version,
+        )
+    }
+}
+
+#[repr(C)]
+struct EfiSystemTable {
+    _reserved0: [u64; 12],
+    pub boot_services: &'static EfiBootServicesTable,
+}
+const _: () = assert!(
+    offset_of!(EfiSystemTable, boot_services) == 96
+);
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct EfiGuid {
+    pub data0: u32,
+    pub data1: u16,
+    pub data2: u16,
+    pub data3: [u8; 8],
+}
+
+const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: EfiGuid =
+    EfiGuid {
+        data0: 0x9042a9de,
+        data1: 0x23dc,
+        data2: 0x4a38,
+        data3: [
+            0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a,
+        ],
+    };
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocol<'a> {
+    reserved: [u64; 3],
+    pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocolMode<'a> {
+    pub max_mode: u32,
+    pub mode: u32,
+    pub info: &'a EfiGraphicsOutputProtocolPixelInfo,
+    pub size_of_info: u64,
+    pub frame_buffer_base: usize,
+    pub frame_buffer_size: usize,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocolPixelInfo {
+    version: u32,
+    pub horizontal_resolution: u32,
+    pub vertical_resolution: u32,
+    _padding: [u32; 5],
+    pub pixels_per_scan_line: u32,
+}
+const _: () = assert!(
+    size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36
+);
+
+fn locate_graphic_protocol<'a>(
+    efi_system_table: &EfiSystemTable,
+) -> Result<&'a EfiGraphicsOutputProtocol<'a>> {
+    let mut graphics_output_protocol =
+        null_mut::<EfiGraphicsOutputProtocol>();
+    let status =
+        (efi_system_table.boot_services.locate_protocol)(
+            &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
+            null_mut::<EfiVoid>(),
+            &mut graphics_output_protocol
+                as *mut *mut EfiGraphicsOutputProtocol
+                as *mut *mut EfiVoid,
+        );
+    if status != EfiStatus::Success {
+        return Err(
+            "Failed to locate Graphics Output Protocol",
+        );
+    }
+    Ok(unsafe { &*graphics_output_protocol })
 }
 
 #[no_mangle]
@@ -124,12 +330,33 @@ fn efi_main(
         );
     }
 
-    draw_str_fg(&mut vram, 1205, 500, 0xcccccc, "Hello, world!");
+    draw_str_fg(
+        &mut vram,
+        1205,
+        500,
+        0xcccccc,
+        "Hello, world!",
+    );
 
     let mut w = VramTextWriter::new(&mut vram);
     for i in 0..4 {
         writeln!(w, "This is line {i}").unwrap();
     }
+
+    let mut memory_map = MemoryMapHolder::new();
+    let status =efi_system_table.boot_services.get_memory_map(&mut memory_map);
+    writeln!(w, "{status:?}").unwrap();
+
+    let mut total_memory_pages = 0;
+    for e in memory_map.iter() {
+        if e.memory_type != EfiMemoryType::CONVENTIONAL_MEMORY {
+            continue;
+        }
+        total_memory_pages += e.number_of_pages;
+        writeln!(w, "{e:?}").unwrap();
+    }
+    let total_memory_size = total_memory_pages * 4096 / 1024 / 1024;
+    writeln!(w, "Total: {total_memory_pages} pages = {total_memory_size} MiB").unwrap();
 
     loop {
         hlt();
@@ -144,7 +371,11 @@ struct VramTextWriter<'a> {
 
 impl<'a> VramTextWriter<'a> {
     fn new(vram: &'a mut VramBufferInfo) -> Self {
-        Self { vram, cursor_x: 0, cursor_y: 0 }
+        Self {
+            vram,
+            cursor_x: 0,
+            cursor_y: 0,
+        }
     }
 }
 
@@ -156,7 +387,13 @@ impl fmt::Write for VramTextWriter<'_> {
                 self.cursor_y += 16;
                 continue;
             }
-            draw_font_fg(self.vram, self.cursor_x, self.cursor_y, 0xffffff, c);
+            draw_font_fg(
+                self.vram,
+                self.cursor_x,
+                self.cursor_y,
+                0xffffff,
+                c,
+            );
             self.cursor_x += 8;
         }
         Ok(())
@@ -245,100 +482,6 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {
         hlt();
     }
-}
-
-#[repr(C)]
-struct EfiBootServicesTable {
-    _reserved0: [u64; 40],
-    locate_protocol: extern "win64" fn(
-        protocol: *const EfiGuid,
-        registration: *const EfiVoid,
-        interface: *mut *mut EfiVoid,
-    ) -> EfiStatus,
-}
-const _: () = assert!(
-    offset_of!(EfiBootServicesTable, locate_protocol)
-        == 320
-);
-
-#[repr(C)]
-struct EfiSystemTable {
-    _reserved0: [u64; 12],
-    pub boot_services: &'static EfiBootServicesTable,
-}
-const _: () = assert!(
-    offset_of!(EfiSystemTable, boot_services) == 96
-);
-
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct EfiGuid {
-    pub data0: u32,
-    pub data1: u16,
-    pub data2: u16,
-    pub data3: [u8; 8],
-}
-
-const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: EfiGuid =
-    EfiGuid {
-        data0: 0x9042a9de,
-        data1: 0x23dc,
-        data2: 0x4a38,
-        data3: [
-            0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a,
-        ],
-    };
-
-#[repr(C)]
-#[derive(Debug)]
-struct EfiGraphicsOutputProtocol<'a> {
-    reserved: [u64; 3],
-    pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct EfiGraphicsOutputProtocolMode<'a> {
-    pub max_mode: u32,
-    pub mode: u32,
-    pub info: &'a EfiGraphicsOutputProtocolPixelInfo,
-    pub size_of_info: u64,
-    pub frame_buffer_base: usize,
-    pub frame_buffer_size: usize,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct EfiGraphicsOutputProtocolPixelInfo {
-    version: u32,
-    pub horizontal_resolution: u32,
-    pub vertical_resolution: u32,
-    _padding: [u32; 5],
-    pub pixels_per_scan_line: u32,
-}
-const _: () = assert!(
-    size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36
-);
-
-fn locate_graphic_protocol<'a>(
-    efi_system_table: &EfiSystemTable,
-) -> Result<&'a EfiGraphicsOutputProtocol<'a>> {
-    let mut graphics_output_protocol =
-        null_mut::<EfiGraphicsOutputProtocol>();
-    let status =
-        (efi_system_table.boot_services.locate_protocol)(
-            &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
-            null_mut::<EfiVoid>(),
-            &mut graphics_output_protocol
-                as *mut *mut EfiGraphicsOutputProtocol
-                as *mut *mut EfiVoid,
-        );
-    if status != EfiStatus::Success {
-        return Err(
-            "Failed to locate Graphics Output Protocol",
-        );
-    }
-    Ok(unsafe { &*graphics_output_protocol })
 }
 
 trait Bitmap {
