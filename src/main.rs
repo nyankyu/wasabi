@@ -27,8 +27,8 @@ fn efi_main(
     let mut vram = init_vram(efi_system_table)
         .expect("Failed to init vram");
 
-    let vw = vram.width();
-    let vh = vram.height();
+    let vw = vram.width() - 1;
+    let vh = vram.height() - 1;
     fill_rect(&mut vram, 0x000000, 0, 0, vw, vh)
         .expect("fill_rect failed");
     fill_rect(&mut vram, 0xff0000, 32, 32, 32, 32)
@@ -41,9 +41,35 @@ fn efi_main(
     draw_line(&mut vram, 0xff00ff, 600, 0, 0, 600)
         .expect("draw_line failed");
 
-    for i in 0..20 {
-        let (x0, y0) = (400, 500);
+    draw_line(&mut vram, 0xffff00, 0, 0, vw, 0).expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, 0, 0, 0, vh).expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, vw, 0, vw, vh).expect("draw_line failed");
+    draw_line(&mut vram, 0xffffff, 0, vh, vw, vh).expect("draw_line failed");
 
+    let (x0, y0) = (400, 500);
+    for i in 0..=10 {
+        draw_line(
+            &mut vram,
+            0xaaaaaa,
+            x0 - 100 + i * 20,
+            y0 - 100,
+            x0 - 100 + i * 20,
+            y0 + 100,
+        )
+        .expect("draw_line failed");
+
+        draw_line(
+            &mut vram,
+            0xaaaaaa,
+            x0 - 100,
+            y0 - 100 + i * 20,
+            x0 + 100,
+            y0 - 100 + i * 20,
+        )
+        .expect("draw_line failed");
+    }
+
+    for i in 0..20 {
         draw_line(
             &mut vram,
             0xff0000,
