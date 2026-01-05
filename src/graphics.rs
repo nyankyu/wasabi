@@ -15,11 +15,13 @@ pub trait Bitmap {
         x: u32,
         y: u32,
     ) -> *mut u32 {
-        self.buf_mut().add(
-            ((y * self.pixels_per_line() + x)
-                * self.bytes_per_pixel())
-                as usize,
-        ) as *mut u32
+        (unsafe {
+            self.buf_mut().add(
+                ((y * self.pixels_per_line() + x)
+                    * self.bytes_per_pixel())
+                    as usize,
+            )
+        }) as *mut u32
     }
 
     #[allow(unused)]
@@ -57,7 +59,7 @@ unsafe fn unchecked_draw_point<T: Bitmap>(
     x: u32,
     y: u32,
 ) {
-    *buf.unchecked_pixel_at_mut(x, y) = color;
+    unsafe { *buf.unchecked_pixel_at_mut(x, y) = color };
 }
 
 /// Draws a point on the bitmap with a specified color at
@@ -192,29 +194,25 @@ fn lookup_font(c: char) -> Option<[[char; 8]; 16]> {
     if let Ok(c) = u8::try_from(c) {
         let mut fi = FONT_SOURCE.split('\n');
         while let Some(line) = fi.next() {
-            if let Some(line) = line.strip_prefix("0x") {
-                if let Ok(idx) =
+            if let Some(line) = line.strip_prefix("0x")
+                && let Ok(idx) =
                     u8::from_str_radix(line, 16)
+            {
+                if idx != c {
+                    continue;
+                }
+                let mut font = [['*'; 8]; 16];
+                for (y, line) in
+                    fi.clone().take(16).enumerate()
                 {
-                    if idx != c {
-                        continue;
-                    }
-                    let mut font = [['*'; 8]; 16];
-                    for (y, line) in
-                        fi.clone().take(16).enumerate()
-                    {
-                        for (x, c) in
-                            line.chars().enumerate()
+                    for (x, c) in line.chars().enumerate() {
+                        if let Some(e) = font[y].get_mut(x)
                         {
-                            if let Some(e) =
-                                font[y].get_mut(x)
-                            {
-                                *e = c;
-                            }
+                            *e = c;
                         }
                     }
-                    return Some(font);
                 }
+                return Some(font);
             }
         }
     }

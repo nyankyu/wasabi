@@ -2,8 +2,8 @@ use core::fmt;
 use core::mem::offset_of;
 use core::ptr::null_mut;
 
-use crate::graphics::draw_font_fg;
 use crate::graphics::Bitmap;
+use crate::graphics::draw_font_fg;
 use crate::result::Result;
 
 pub type EfiHandle = u64;
