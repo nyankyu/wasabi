@@ -25,7 +25,21 @@ pub fn round_up_to_nearest_pow2(v: usize) -> Result<usize> {
 
 #[test_case]
 fn round_up_to_nearest_pow2_test() {
-    unimplemented!("cargo test should fail, right...?")
+    assert_eq!(round_up_to_nearest_pow2(0), Err("Out of range"));
+    assert_eq!(round_up_to_nearest_pow2(1), Ok(1));
+    assert_eq!(round_up_to_nearest_pow2(2), Ok(2));
+    assert_eq!(round_up_to_nearest_pow2(3), Ok(4));
+    assert_eq!(round_up_to_nearest_pow2(4), Ok(4));
+    assert_eq!(round_up_to_nearest_pow2(5), Ok(8));
+    assert_eq!(round_up_to_nearest_pow2(6), Ok(8));
+    assert_eq!(round_up_to_nearest_pow2(7), Ok(8));
+    assert_eq!(round_up_to_nearest_pow2(8), Ok(8));
+    assert_eq!(round_up_to_nearest_pow2(9), Ok(16));
+    assert_eq!(round_up_to_nearest_pow2(10), Ok(16));
+    assert_eq!(round_up_to_nearest_pow2(15), Ok(16));
+    assert_eq!(round_up_to_nearest_pow2(16), Ok(16));
+    assert_eq!(round_up_to_nearest_pow2(17), Ok(32));
+    assert_eq!(round_up_to_nearest_pow2(18), Ok(32));
 }
 
 struct Header {
@@ -260,5 +274,36 @@ impl FirstFitAllocator {
 
         let mut header = self.first_header.borrow_mut();
         header.as_mut().unwrap().next_header = prev_last;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test_case]
+    fn malloc_iterate_free_and_alloc() {
+        use alloc::vec::Vec;
+        for i in 0..100 {
+            let mut vec = Vec::new();
+            vec.resize(i, 10);
+        }
+    }
+
+    #[test_case]
+    fn malloc_align() {
+        let mut pointers = [null_mut::<u8>(); 100];
+        for align in [1,2,4,8,16,32,4096] {
+            for e in pointers.iter_mut() {
+                *e = ALLOCATOR.alloc_with_options(
+                    Layout::from_size_align(1234, align)
+                    .expect("Failed to create Layout"),
+                );
+
+                assert!(*e as usize != 0);
+                assert!((*e as usize) % align == 0);
+            }
+        }
     }
 }
