@@ -245,6 +245,7 @@ impl FirstFitAllocator {
         }
     }
 
+    /// prepend to the linked list
     fn add_free_from_descriptor(
         &self,
         desc: &EfiMemoryDescriptor,
@@ -264,16 +265,11 @@ impl FirstFitAllocator {
         let mut header = unsafe {
             Header::new_from_address(start_address)
         };
-        header.next_header = None;
         header.is_allocated = false;
         header.size = size;
-        let mut first_header =
-            self.first_header.borrow_mut();
-        let prev_last = first_header.replace(header);
-        drop(first_header);
+        header.next_header = self.first_header.borrow_mut().take();
 
-        let mut header = self.first_header.borrow_mut();
-        header.as_mut().unwrap().next_header = prev_last;
+        *self.first_header.borrow_mut() = Some(header);
     }
 }
 
