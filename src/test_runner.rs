@@ -14,19 +14,31 @@ where
     T: Fn(),
 {
     fn run(&self, writer: &mut SerialPort) {
-        writeln!(writer, "[RUNNING] >>> {}", type_name::<T>()).unwrap();
+        writeln!(
+            writer,
+            "[RUNNING] >>> {}",
+            type_name::<T>()
+        )
+        .unwrap();
         self();
-        writeln!(writer, "[PASS   ] <<< {}", type_name::<T>()).unwrap();
+        writeln!(
+            writer,
+            "[PASS   ] <<< {}",
+            type_name::<T>()
+        )
+        .unwrap();
     }
 }
 
 pub fn test_runner(tests: &[&dyn Testable]) -> ! {
     let mut sw = SerialPort::new_for_com1();
-    writeln!(sw, "Running {} tests...", tests.len()).unwrap();
+    writeln!(sw, "Running {} tests...", tests.len())
+        .unwrap();
     for test in tests {
         test.run(&mut sw);
     }
-    writeln!(sw, "Completed {} tests !", tests.len()).unwrap();
+    writeln!(sw, "Completed {} tests !", tests.len())
+        .unwrap();
     exit_qemu(QemuExitCode::Success)
 }
 
