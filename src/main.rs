@@ -5,8 +5,11 @@ use core::fmt::Write;
 use core::panic::PanicInfo;
 use core::writeln;
 
+use wasabi::error;
 use wasabi::graphics::draw_test;
+use wasabi::info;
 use wasabi::init::init_basic_runtime;
+use wasabi::println;
 use wasabi::qemu::QemuExitCode;
 use wasabi::qemu::exit_qemu;
 use wasabi::uefi::EfiHandle;
@@ -14,7 +17,7 @@ use wasabi::uefi::EfiMemoryType;
 use wasabi::uefi::EfiSystemTable;
 use wasabi::uefi::VramTextWriter;
 use wasabi::uefi::init_vram;
-
+use wasabi::warn;
 use wasabi::x86::hlt;
 
 #[unsafe(no_mangle)]
@@ -36,6 +39,7 @@ fn efi_main(
     let memory_map =
         init_basic_runtime(image_handle, efi_system_table);
 
+/*
     let mut total_memory_pages = 0;
 
     for e in memory_map.iter() {
@@ -57,8 +61,12 @@ fn efi_main(
         total_memory_pages, total_memory_size
     )
     .unwrap();
+*/
 
-    writeln!(w, "Hello, Non-UEFI world!").unwrap();
+    println!("Booting WasabiOS");
+    info!("info");
+    warn!("warn");
+    error!("error");
 
     loop {
         hlt();
