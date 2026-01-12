@@ -189,35 +189,10 @@ fn increase_in_short_side(
     }
 }
 
-fn lookup_font(c: char) -> Option<[[char; 8]; 16]> {
-    const FONT_SOURCE: &str = include_str!("./font.txt");
-    if let Ok(c) = u8::try_from(c) {
-        let mut fi = FONT_SOURCE.split('\n');
-        while let Some(line) = fi.next() {
-            if let Some(line) = line.strip_prefix("0x")
-                && let Ok(idx) =
-                    u8::from_str_radix(line, 16)
-            {
-                if idx != c {
-                    continue;
-                }
-                let mut font = [['*'; 8]; 16];
-                for (y, line) in
-                    fi.clone().take(16).enumerate()
-                {
-                    for (x, c) in line.chars().enumerate() {
-                        if let Some(e) = font[y].get_mut(x)
-                        {
-                            *e = c;
-                        }
-                    }
-                }
-                return Some(font);
-            }
-        }
-    }
-    None
-}
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/font_table.rs"
+));
 
 pub fn draw_font_fg<T: Bitmap>(
     buf: &mut T,
@@ -226,10 +201,13 @@ pub fn draw_font_fg<T: Bitmap>(
     color: u32,
     c: char,
 ) {
-    let Some(font) = lookup_font(c) else {
+    if u8::try_from(c).is_err() {
         return;
     };
-    for (dy, row) in font.iter().enumerate() {
+
+    for (dy, row) in
+        FONT_TABLE[c as usize].iter().enumerate()
+    {
         for (dx, pixel) in row.iter().enumerate() {
             if *pixel != '*' {
                 continue;

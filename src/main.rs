@@ -40,29 +40,27 @@ fn efi_main(
     let memory_map =
         init_basic_runtime(image_handle, efi_system_table);
 
-    /*
-        let mut total_memory_pages = 0;
+    let mut total_memory_pages = 0;
 
-        for e in memory_map.iter() {
-            if e.memory_type()
-                != EfiMemoryType::CONVENTIONAL_MEMORY
-            {
-                continue;
-            }
-            total_memory_pages += e.number_of_pages();
-            writeln!(w, "{e:?}").unwrap();
+    for e in memory_map.iter() {
+        if e.memory_type()
+            != EfiMemoryType::CONVENTIONAL_MEMORY
+        {
+            continue;
         }
+        total_memory_pages += e.number_of_pages();
+        writeln!(w, "{e:?}").unwrap();
+    }
 
-        let total_memory_size =
-            total_memory_pages * 4096 / 1024 / 1024;
+    let total_memory_size =
+        total_memory_pages * 4096 / 1024 / 1024;
 
-        writeln!(
-            w,
-            "Total: {} pages = {} MiB",
-            total_memory_pages, total_memory_size
-        )
-        .unwrap();
-    */
+    writeln!(
+        w,
+        "Total: {} pages = {} MiB",
+        total_memory_pages, total_memory_size
+    )
+    .unwrap();
 
     println!("Booting WasabiOS");
     info!("info");
