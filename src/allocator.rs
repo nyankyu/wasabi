@@ -17,18 +17,13 @@ use core::ptr::null_mut;
 
 pub fn round_up_to_nearest_pow2(v: usize) -> Result<usize> {
     1usize
-        .checked_shl(
-            usize::BITS - v.wrapping_sub(1).leading_zeros(),
-        )
+        .checked_shl(usize::BITS - v.wrapping_sub(1).leading_zeros())
         .ok_or("Out of range")
 }
 
 #[test_case]
 fn round_up_to_nearest_pow2_test() {
-    assert_eq!(
-        round_up_to_nearest_pow2(0),
-        Err("Out of range")
-    );
+    assert_eq!(round_up_to_nearest_pow2(0), Err("Out of range"));
     assert_eq!(round_up_to_nearest_pow2(1), Ok(1));
     assert_eq!(round_up_to_nearest_pow2(2), Ok(2));
     assert_eq!(round_up_to_nearest_pow2(3), Ok(4));
@@ -58,16 +53,11 @@ const HEADER_SIZE: usize = size_of::<Header>();
 const _: () = assert!(HEADER_SIZE == 32);
 const _: () = assert!(HEADER_SIZE.count_ones() == 1);
 
-pub const LAYOUT_PAGE_4K: Layout = unsafe {
-    Layout::from_size_align_unchecked(4096, 4096)
-};
+pub const LAYOUT_PAGE_4K: Layout =
+    unsafe { Layout::from_size_align_unchecked(4096, 4096) };
 
 impl Header {
-    fn can_provide(
-        &self,
-        size: usize,
-        align: usize,
-    ) -> bool {
+    fn can_provide(&self, size: usize, align: usize) -> bool {
         self.size >= size + HEADER_SIZE * 2 + align
     }
 
@@ -79,9 +69,7 @@ impl Header {
         self as *const Header as usize + self.size
     }
 
-    unsafe fn new_from_address(
-        address: usize,
-    ) -> Box<Header> {
+    unsafe fn new_from_address(address: usize) -> Box<Header> {
         let header = address as *mut Header;
         unsafe {
             header.write(Header {
@@ -94,61 +82,39 @@ impl Header {
         }
     }
 
-    unsafe fn from_allocated_region(
-        address: *mut u8,
-    ) -> Box<Header> {
-        let header = unsafe { address.sub(HEADER_SIZE) }
-            as *mut Header;
+    unsafe fn from_allocated_region(address: *mut u8) -> Box<Header> {
+        let header = unsafe { address.sub(HEADER_SIZE) } as *mut Header;
         unsafe { Box::from_raw(header) }
     }
 
-    fn provide(
-        &mut self,
-        size: usize,
-        align: usize,
-    ) -> Option<*mut u8> {
-        let size = max(
-            round_up_to_nearest_pow2(size).ok()?,
-            HEADER_SIZE,
-        );
+    fn provide(&mut self, size: usize, align: usize) -> Option<*mut u8> {
+        let size = max(round_up_to_nearest_pow2(size).ok()?, HEADER_SIZE);
         let align = max(align, HEADER_SIZE);
-        if self.is_allocated()
-            || !self.can_provide(size, align)
-        {
+        if self.is_allocated() || !self.can_provide(size, align) {
             return None;
         }
 
         let mut size_used = 0;
-        let allocated_address =
-            (self.end_address() - size) & !(align - 1);
+        let allocated_address = (self.end_address() - size) & !(align - 1);
 
-        let mut header_for_allocated = unsafe {
-            Self::new_from_address(
-                allocated_address - HEADER_SIZE,
-            )
-        };
+        let mut header_for_allocated =
+            unsafe { Self::new_from_address(allocated_address - HEADER_SIZE) };
         header_for_allocated.is_allocated = true;
         header_for_allocated.size = size + HEADER_SIZE;
         size_used += header_for_allocated.size;
-        header_for_allocated.next_header =
-            self.next_header.take();
+        header_for_allocated.next_header = self.next_header.take();
 
-        if header_for_allocated.end_address()
-            != self.end_address()
-        {
+        if header_for_allocated.end_address() != self.end_address() {
             let mut header_for_padding = unsafe {
-                Self::new_from_address(
-                    header_for_allocated.end_address(),
-                )
+                Self::new_from_address(header_for_allocated.end_address())
             };
             header_for_padding.is_allocated = false;
-            header_for_padding.size = self.end_address()
-                - header_for_allocated.end_address();
+            header_for_padding.size =
+                self.end_address() - header_for_allocated.end_address();
             size_used += header_for_padding.size;
             header_for_padding.next_header =
                 header_for_allocated.next_header.take();
-            header_for_allocated.next_header =
-                Some(header_for_padding);
+            header_for_allocated.next_header = Some(header_for_padding);
         }
 
         assert!(self.size >= size_used + HEADER_SIZE);
@@ -165,10 +131,7 @@ impl Drop for Header {
 }
 
 impl fmt::Debug for Header {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Header @ {:#018X} {{ size: {:#018X}, is_allocated: {} }}",
@@ -184,10 +147,9 @@ pub struct FirstFitAllocator {
 }
 
 #[global_allocator]
-pub static ALLOCATOR: FirstFitAllocator =
-    FirstFitAllocator {
-        first_header: RefCell::new(None),
-    };
+pub static ALLOCATOR: FirstFitAllocator = FirstFitAllocator {
+    first_header: RefCell::new(None),
+};
 
 unsafe impl Sync for FirstFitAllocator {}
 
@@ -196,30 +158,20 @@ unsafe impl GlobalAlloc for FirstFitAllocator {
         self.alloc_with_options(layout)
     }
 
-    unsafe fn dealloc(
-        &self,
-        ptr: *mut u8,
-        _layout: Layout,
-    ) {
-        let mut region =
-            unsafe { Header::from_allocated_region(ptr) };
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        let mut region = unsafe { Header::from_allocated_region(ptr) };
         region.is_allocated = false;
         Box::leak(region);
     }
 }
 
 impl FirstFitAllocator {
-    pub fn alloc_with_options(
-        &self,
-        layout: Layout,
-    ) -> *mut u8 {
+    pub fn alloc_with_options(&self, layout: Layout) -> *mut u8 {
         let mut header = self.first_header.borrow_mut();
         let mut header = header.deref_mut();
         loop {
             match header {
-                Some(e) => match e
-                    .provide(layout.size(), layout.align())
-                {
+                Some(e) => match e.provide(layout.size(), layout.align()) {
                     Some(p) => break p,
                     None => {
                         header = e.next_header.borrow_mut();
@@ -233,14 +185,9 @@ impl FirstFitAllocator {
         }
     }
 
-    pub fn init_with_mmap(
-        &self,
-        memory_map: &MemoryMapHolder,
-    ) {
+    pub fn init_with_mmap(&self, memory_map: &MemoryMapHolder) {
         for e in memory_map.iter() {
-            if e.memory_type()
-                != EfiMemoryType::CONVENTIONAL_MEMORY
-            {
+            if e.memory_type() != EfiMemoryType::CONVENTIONAL_MEMORY {
                 continue;
             }
 
@@ -249,14 +196,9 @@ impl FirstFitAllocator {
     }
 
     /// prepend to the linked list
-    fn add_free_from_descriptor(
-        &self,
-        desc: &EfiMemoryDescriptor,
-    ) {
-        let mut start_address =
-            desc.physical_start() as usize;
-        let mut size =
-            desc.number_of_pages() as usize * 4096;
+    fn add_free_from_descriptor(&self, desc: &EfiMemoryDescriptor) {
+        let mut start_address = desc.physical_start() as usize;
+        let mut size = desc.number_of_pages() as usize * 4096;
         if start_address == 0 {
             start_address += 4096;
             size = size.saturating_sub(4096);
@@ -265,13 +207,10 @@ impl FirstFitAllocator {
             return;
         }
 
-        let mut header = unsafe {
-            Header::new_from_address(start_address)
-        };
+        let mut header = unsafe { Header::new_from_address(start_address) };
         header.is_allocated = false;
         header.size = size;
-        header.next_header =
-            self.first_header.borrow_mut().take();
+        header.next_header = self.first_header.borrow_mut().take();
 
         *self.first_header.borrow_mut() = Some(header);
     }
@@ -302,9 +241,7 @@ mod tests {
                 );
 
                 assert!(*e as usize != 0);
-                assert!(
-                    (*e as usize).is_multiple_of(align)
-                );
+                assert!((*e as usize).is_multiple_of(align));
             }
         }
     }
@@ -320,9 +257,7 @@ mod tests {
                 );
 
                 assert!(*e as usize != 0);
-                assert!(
-                    (*e as usize).is_multiple_of(align)
-                );
+                assert!((*e as usize).is_multiple_of(align));
             }
         }
     }
@@ -366,16 +301,12 @@ mod tests {
             Layout::from_size_align(60000, 64).unwrap(),
             Layout::from_size_align(60000, 64).unwrap(),
         ];
-        let mut pointers =
-            vec![null_mut::<u8>(); allocations.len()];
+        let mut pointers = vec![null_mut::<u8>(); allocations.len()];
 
-        for (i, (layout, pointer)) in allocations
-            .iter()
-            .zip(pointers.iter_mut())
-            .enumerate()
+        for (i, (layout, pointer)) in
+            allocations.iter().zip(pointers.iter_mut()).enumerate()
         {
-            *pointer =
-                ALLOCATOR.alloc_with_options(*layout);
+            *pointer = ALLOCATOR.alloc_with_options(*layout);
             for k in 0..layout.size() {
                 unsafe {
                     *pointer.add(k) = i as u8;
@@ -383,15 +314,11 @@ mod tests {
             }
         }
 
-        for (i, (layout, pointer)) in allocations
-            .iter()
-            .zip(pointers.iter_mut())
-            .enumerate()
+        for (i, (layout, pointer)) in
+            allocations.iter().zip(pointers.iter_mut()).enumerate()
         {
             for k in 0..layout.size() {
-                assert!(unsafe {
-                    *pointer.add(k) == i as u8
-                });
+                assert!(unsafe { *pointer.add(k) == i as u8 });
             }
         }
 
@@ -414,9 +341,7 @@ mod tests {
             .step_by(2)
         {
             for k in 0..layout.size() {
-                assert!(unsafe {
-                    *pointer.add(k) == i as u8
-                });
+                assert!(unsafe { *pointer.add(k) == i as u8 });
             }
         }
 
@@ -426,22 +351,17 @@ mod tests {
             .enumerate()
             .step_by(2)
         {
-            *pointer =
-                ALLOCATOR.alloc_with_options(*layout);
+            *pointer = ALLOCATOR.alloc_with_options(*layout);
             for k in 0..layout.size() {
                 unsafe { *pointer.add(k) = i as u8 };
             }
         }
 
-        for (i, (layout, pointer)) in allocations
-            .iter()
-            .zip(pointers.iter_mut())
-            .enumerate()
+        for (i, (layout, pointer)) in
+            allocations.iter().zip(pointers.iter_mut()).enumerate()
         {
             for k in 0..layout.size() {
-                assert!(unsafe {
-                    *pointer.add(k) == i as u8
-                });
+                assert!(unsafe { *pointer.add(k) == i as u8 });
             }
         }
     }

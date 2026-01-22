@@ -17,17 +17,12 @@ use wasabi::x86::init_exceptions;
 use wasabi::x86::trigger_debug_interrupt;
 
 #[unsafe(no_mangle)]
-fn efi_main(
-    image_handle: EfiHandle,
-    efi_system_table: &EfiSystemTable,
-) {
-    let mut vram = init_vram(efi_system_table)
-        .expect("Failed to init vram");
+fn efi_main(image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
+    let mut vram = init_vram(efi_system_table).expect("Failed to init vram");
 
     draw_test(&mut vram);
 
-    let _memory_map =
-        init_basic_runtime(image_handle, efi_system_table);
+    let _memory_map = init_basic_runtime(image_handle, efi_system_table);
 
     println!("Booting WasabiOS");
 

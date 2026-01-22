@@ -10,33 +10,19 @@ pub trait Bitmap {
 
     /// # Safety
     #[allow(unused)]
-    unsafe fn unchecked_pixel_at_mut(
-        &mut self,
-        x: u32,
-        y: u32,
-    ) -> *mut u32 {
+    unsafe fn unchecked_pixel_at_mut(&mut self, x: u32, y: u32) -> *mut u32 {
         (unsafe {
             self.buf_mut().add(
-                ((y * self.pixels_per_line() + x)
-                    * self.bytes_per_pixel())
+                ((y * self.pixels_per_line() + x) * self.bytes_per_pixel())
                     as usize,
             )
         }) as *mut u32
     }
 
     #[allow(unused)]
-    fn pixel_at_mut(
-        &mut self,
-        x: u32,
-        y: u32,
-    ) -> Option<&mut u32> {
+    fn pixel_at_mut(&mut self, x: u32, y: u32) -> Option<&mut u32> {
         if self.is_in_x_range(x) && self.is_in_y_range(y) {
-            unsafe {
-                Some(
-                    &mut *(self
-                        .unchecked_pixel_at_mut(x, y)),
-                )
-            }
+            unsafe { Some(&mut *(self.unchecked_pixel_at_mut(x, y))) }
         } else {
             None
         }
@@ -71,8 +57,7 @@ fn draw_point<T: Bitmap>(
     x: u32,
     y: u32,
 ) -> Result<()> {
-    *(buf.pixel_at_mut(x, y).ok_or("Out of bounds")?) =
-        color;
+    *(buf.pixel_at_mut(x, y).ok_or("Out of bounds")?) = color;
     Ok(())
 }
 
@@ -101,12 +86,7 @@ fn fill_rect<T: Bitmap>(
     for i in 0..h {
         for j in 0..w {
             unsafe {
-                unchecked_draw_point(
-                    buf,
-                    color,
-                    x + j,
-                    y + i,
-                );
+                unchecked_draw_point(buf, color, x + j, y + i);
             }
         }
     }
@@ -140,9 +120,7 @@ fn draw_line<T: Bitmap>(
 
     if dx >= dy {
         (0..dx)
-            .map(|rx| {
-                (rx, increase_in_short_side(dx, dy, rx))
-            })
+            .map(|rx| (rx, increase_in_short_side(dx, dy, rx)))
             .for_each(|(rx, ry)| unsafe {
                 unchecked_draw_point(
                     buf,
@@ -153,9 +131,7 @@ fn draw_line<T: Bitmap>(
             });
     } else {
         (0..dy)
-            .map(|ry| {
-                (increase_in_short_side(dy, dx, ry), ry)
-            })
+            .map(|ry| (increase_in_short_side(dy, dx, ry), ry))
             .for_each(|(rx, ry)| unsafe {
                 unchecked_draw_point(
                     buf,
@@ -177,11 +153,7 @@ fn draw_line<T: Bitmap>(
 /// long_side: length of long side
 /// short_side: length of short side
 /// i: increase in long side
-fn increase_in_short_side(
-    long_leng: i32,
-    short_leng: i32,
-    i: i32,
-) -> i32 {
+fn increase_in_short_side(long_leng: i32, short_leng: i32, i: i32) -> i32 {
     if long_leng == 0 {
         0
     } else {
@@ -189,10 +161,7 @@ fn increase_in_short_side(
     }
 }
 
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/font_table.rs"
-));
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/font_table.rs"));
 
 pub fn draw_font_fg<T: Bitmap>(
     buf: &mut T,
@@ -205,60 +174,38 @@ pub fn draw_font_fg<T: Bitmap>(
         return;
     };
 
-    for (dy, row) in
-        FONT_TABLE[c as usize].iter().enumerate()
-    {
+    for (dy, row) in FONT_TABLE[c as usize].iter().enumerate() {
         for (dx, pixel) in row.iter().enumerate() {
             if *pixel != '*' {
                 continue;
             }
-            let _ = draw_point(
-                buf,
-                color,
-                x + dx as u32,
-                y + dy as u32,
-            );
+            let _ = draw_point(buf, color, x + dx as u32, y + dy as u32);
         }
     }
 }
 
 #[allow(unused)]
-fn draw_str_fg<T: Bitmap>(
-    buf: &mut T,
-    x: u32,
-    y: u32,
-    color: u32,
-    s: &str,
-) {
-    s.chars().enumerate().for_each(|(i, c)| {
-        draw_font_fg(buf, x + i as u32 * 8, y, color, c)
-    });
+fn draw_str_fg<T: Bitmap>(buf: &mut T, x: u32, y: u32, color: u32, s: &str) {
+    s.chars()
+        .enumerate()
+        .for_each(|(i, c)| draw_font_fg(buf, x + i as u32 * 8, y, color, c));
 }
 
 #[allow(unused)]
 pub fn draw_test<T: Bitmap>(buf: &mut T) {
     let vw = buf.width() - 1;
     let vh = buf.height() - 1;
-    fill_rect(buf, 0x000000, 0, 0, vw, vh)
-        .expect("fill_rect failed");
-    fill_rect(buf, 0xff0000, 32, 32, 32, 32)
-        .expect("fill_rect failed");
-    fill_rect(buf, 0x00ff00, 64, 64, 64, 64)
-        .expect("fill_rect failed");
-    fill_rect(buf, 0x0000ff, 128, 128, 128, 128)
-        .expect("fill_rect failed");
+    fill_rect(buf, 0x000000, 0, 0, vw, vh).expect("fill_rect failed");
+    fill_rect(buf, 0xff0000, 32, 32, 32, 32).expect("fill_rect failed");
+    fill_rect(buf, 0x00ff00, 64, 64, 64, 64).expect("fill_rect failed");
+    fill_rect(buf, 0x0000ff, 128, 128, 128, 128).expect("fill_rect failed");
 
-    draw_line(buf, 0xff00ff, 600, 0, 0, 600)
-        .expect("draw_line failed");
+    draw_line(buf, 0xff00ff, 600, 0, 0, 600).expect("draw_line failed");
 
-    draw_line(buf, 0xffff00, 0, 0, vw, 0)
-        .expect("draw_line failed");
-    draw_line(buf, 0xffffff, 0, 0, 0, vh)
-        .expect("draw_line failed");
-    draw_line(buf, 0xffffff, vw, 0, vw, vh)
-        .expect("draw_line failed");
-    draw_line(buf, 0xffffff, 0, vh, vw, vh)
-        .expect("draw_line failed");
+    draw_line(buf, 0xffff00, 0, 0, vw, 0).expect("draw_line failed");
+    draw_line(buf, 0xffffff, 0, 0, 0, vh).expect("draw_line failed");
+    draw_line(buf, 0xffffff, vw, 0, vw, vh).expect("draw_line failed");
+    draw_line(buf, 0xffffff, 0, vh, vw, vh).expect("draw_line failed");
 
     let (x0, y0) = (400, 500);
     for i in 0..=10 {
@@ -284,51 +231,17 @@ pub fn draw_test<T: Bitmap>(buf: &mut T) {
     }
 
     for i in 0..20 {
-        draw_line(
-            buf,
-            0xff0000,
-            x0,
-            y0,
-            x0 - 100 + i * 10,
-            y0 + 100,
-        )
-        .expect("draw_line failed");
-        draw_line(
-            buf,
-            0x00ff00,
-            x0,
-            y0,
-            x0 + 100 - i * 10,
-            y0 - 100,
-        )
-        .expect("draw_line failed");
-        draw_line(
-            buf,
-            0x00ffff,
-            x0,
-            y0,
-            x0 - 100,
-            y0 - 100 + i * 10,
-        )
-        .expect("draw_line failed");
-        draw_line(
-            buf,
-            0xffff00,
-            x0,
-            y0,
-            x0 + 100,
-            y0 + 100 - i * 10,
-        )
-        .expect("draw_line failed");
+        draw_line(buf, 0xff0000, x0, y0, x0 - 100 + i * 10, y0 + 100)
+            .expect("draw_line failed");
+        draw_line(buf, 0x00ff00, x0, y0, x0 + 100 - i * 10, y0 - 100)
+            .expect("draw_line failed");
+        draw_line(buf, 0x00ffff, x0, y0, x0 - 100, y0 - 100 + i * 10)
+            .expect("draw_line failed");
+        draw_line(buf, 0xffff00, x0, y0, x0 + 100, y0 + 100 - i * 10)
+            .expect("draw_line failed");
     }
 
     for (i, c) in "ABCDEFG".chars().enumerate() {
-        draw_font_fg(
-            buf,
-            i as u32 * 16 + 256,
-            i as u32 * 16,
-            0xffffff,
-            c,
-        );
+        draw_font_fg(buf, i as u32 * 16 + 256, i as u32 * 16, 0xffffff, c);
     }
 }

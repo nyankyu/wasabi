@@ -764,8 +764,7 @@ pub const BIT_DPL3: u64 = 3u64 << 45;
 enum GdtAttr {
     KernelCode =
         BIT_TYPE_CODE | BIT_PRESENT | BIT_CS_LONG_MODE | BIT_CS_READABLE,
-    KernelData =
-        BIT_TYPE_DATA | BIT_PRESENT | BIT_DS_WRITABLE,
+    KernelData = BIT_TYPE_DATA | BIT_PRESENT | BIT_DS_WRITABLE,
 }
 
 #[allow(dead_code)]
@@ -881,5 +880,7 @@ impl TaskStateSegment64Descriptor {
 const _: () = assert!(size_of::<TaskStateSegment64Descriptor>() == 16);
 
 pub fn trigger_debug_interrupt() {
-    unsafe { asm!("int 3"); }
+    unsafe {
+        asm!("int 3");
+    }
 }

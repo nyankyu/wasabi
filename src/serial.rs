@@ -24,14 +24,8 @@ impl SerialPort {
 
         // baud rate = (115200 / BAUD_DIVISOR)
         const BAUD_DIVISOR: u16 = 0x0001;
-        write_io_port_u8(
-            self.base,
-            (BAUD_DIVISOR & 0xff) as u8,
-        );
-        write_io_port_u8(
-            self.base + 1,
-            (BAUD_DIVISOR >> 8) as u8,
-        );
+        write_io_port_u8(self.base, (BAUD_DIVISOR & 0xff) as u8);
+        write_io_port_u8(self.base + 1, (BAUD_DIVISOR >> 8) as u8);
 
         // 8 bits, no parity, one stop bit
         write_io_port_u8(self.base + 3, 0x03);
