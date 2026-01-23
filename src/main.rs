@@ -12,30 +12,25 @@ use wasabi::qemu::exit_qemu;
 use wasabi::uefi::EfiHandle;
 use wasabi::uefi::EfiSystemTable;
 use wasabi::uefi::init_vram;
+use wasabi::uefi::locate_loaded_image_protocol;
 use wasabi::x86::hlt;
 use wasabi::x86::init_exceptions;
 use wasabi::x86::trigger_debug_interrupt;
 
 #[unsafe(no_mangle)]
 fn efi_main(image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
-    let mut vram = init_vram(efi_system_table).expect("Failed to init vram");
-
-    draw_test(&mut vram);
-
-    let _memory_map = init_basic_runtime(image_handle, efi_system_table);
-
     println!("Booting WasabiOS");
 
-    let cr3 = wasabi::x86::read_cr3();
-    println!("cr3 = {cr3:#p}");
-    let t = Some(unsafe { &*cr3 });
-    println!("{t:?}");
-    let t = t.and_then(|t| t.next_level(0));
-    println!("{t:?}");
-    let t = t.and_then(|t| t.next_level(0));
-    println!("{t:?}");
-    let t = t.and_then(|t| t.next_level(0));
-    println!("{t:?}");
+    let loaded_image_protocol =
+        locate_loaded_image_protocol(image_handle, efi_system_table)
+            .expect("Failed to get LoadedImageProtocol");
+    println!("image_base: {:#018X}", loaded_image_protocol.image_base);
+    println!("image_size: {:#018X}", loaded_image_protocol.image_size);
+
+    //let mut vram = init_vram(efi_system_table).expect("Failed to init vram");
+    //draw_test(&mut vram);
+
+    let _memory_map = init_basic_runtime(image_handle, efi_system_table);
 
     let (_gdt, _idt) = init_exceptions();
     info!("Exception initialized!");
