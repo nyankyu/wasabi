@@ -6,6 +6,7 @@ use core::panic::PanicInfo;
 use wasabi::graphics::draw_test;
 use wasabi::info;
 use wasabi::init::init_basic_runtime;
+use wasabi::init::init_paging;
 use wasabi::println;
 use wasabi::qemu::QemuExitCode;
 use wasabi::qemu::exit_qemu;
@@ -30,11 +31,14 @@ fn efi_main(image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
     //let mut vram = init_vram(efi_system_table).expect("Failed to init vram");
     //draw_test(&mut vram);
 
-    let _memory_map = init_basic_runtime(image_handle, efi_system_table);
+    let memory_map = init_basic_runtime(image_handle, efi_system_table);
 
     let (_gdt, _idt) = init_exceptions();
     info!("Exception initialized!");
     trigger_debug_interrupt();
+
+    init_paging(&memory_map);
+    info!("Now we are using out own page tables!");
 
     loop {
         hlt();
